@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-header">PDF Signer</div>
+
+  <div class="section">
+    <button id="open-pdf" class="btn-primary full-width">Open PDF File</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Signatures</div>
+    <div id="sig-list"></div>
+    <label class="btn-secondary full-width" style="margin-top:8px; cursor:pointer; text-align:center; display:block; padding:7px 0;">
+      + Add Signature Image
+      <input type="file" id="sig-upload" accept="image/*" style="display:none">
+    </label>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

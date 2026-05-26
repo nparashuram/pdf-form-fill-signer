@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PDF Signer</title>
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="tb-group">
+    <button id="btn-open" class="tb-btn" title="Open PDF">📂 Open</button>
+    <input type="file" id="file-input" accept=".pdf" style="display:none">
+  </div>
+
+  <div class="tb-group tb-center">
+    <div class="tb-tool-wrap">
+      <button id="btn-sign" class="tb-btn" title="Sign">✍ Sign</button>
+      <div id="sign-panel" class="panel hidden">
+        <div id="sig-list-viewer"></div>
+        <label class="upload-sig-btn">
+          + Upload &amp; Save Signature
+          <input type="file" id="sig-upload-viewer" accept="image/*" style="display:none">
+        </label>
+        <div class="panel-hint">Click a signature to start placing</div>
+      </div>
+    </div>
+
+    <button id="btn-text" class="tb-btn" title="Add Text">T Text</button>
+    <div id="text-toolbar" class="hidden">
+      <select id="font-family">
+        <option value="Helvetica">Helvetica</option>
+        <option value="Times New Roman">Times Roman</option>
+        <option value="Courier New">Courier</option>
+        <option value="Georgia">Georgia</option>
+      </select>
+      <input type="number" id="font-size" value="16" min="6" max="96">
+      <input type="color" id="font-color" value="#000000">
+      <button id="btn-text-cancel" class="tb-cancel" title="Exit text mode">✕</button>
+    </div>
+  </div>
+
+  <div class="tb-group">
+    <span id="pdf-name" class="pdf-title">No file open</span>
+    <button id="btn-save" class="tb-btn save-btn" title="Save PDF">💾 Save</button>
+  </div>
+</div>
+
+<div id="drop-zone">
+  <div class="drop-content">
+    <div class="drop-icon">📄</div>
+    <div>Drop a PDF here or</div>
+    <button id="drop-open" class="btn-open-large">Choose File</button>
+  </div>
+</div>
+
+<div id="viewer" class="hidden">
+  <div id="pages"></div>
+</div>
+
+<!-- Floating signature that follows cursor -->
+<img id="floating-sig" class="hidden">
+
+<script src="libs/pdf.min.js"></script>
+<script src="libs/pdf-lib.min.js"></script>
+<script src="viewer.js"></script>
+</body>
+</html>
