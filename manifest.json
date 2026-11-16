@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PDF Form Filler & Signer",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Fill PDF forms, draw your signature, and add text — then download the result. No uploads, everything stays in your browser.",
   "permissions": ["storage"],
   "action": {
