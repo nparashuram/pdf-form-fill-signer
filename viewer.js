@@ -12,6 +12,7 @@ const S = {
   pendingSig: null,    // { name, dataUrl } — follows cursor
   textActive: false,   // text tool ready to place
   textCfg: { family: 'Helvetica', size: 16, color: '#000000' },
+  selectedId: null,    // id of the selected annotation
   annotations: [],     // [{id, type:'img'|'text', pageIndex, el, x, y, w, h, ...}]
 };
 let annIdSeq = 0;
@@ -35,6 +36,9 @@ const elFloatSig    = document.getElementById('floating-sig');
 const elFontFamily  = document.getElementById('font-family');
 const elFontSize    = document.getElementById('font-size');
 const elFontColor   = document.getElementById('font-color');
+const elBtnShrink   = document.getElementById('btn-shrink');
+const elBtnGrow     = document.getElementById('btn-grow');
+const elBtnDelete   = document.getElementById('btn-delete');
 
 // ─── Open PDF ─────────────────────────────────────────────────────────────
 function openFilePicker() { elFileIn.click(); }
@@ -62,6 +66,8 @@ async function loadPdfFile(file) {
   // Keep a pristine copy for pdf-lib; PDF.js will detach/consume the buffer it receives
   S.pdfBytes = buf.slice(0);
   S.annotations = [];
+  S.selectedId = null;
+  updateSelectionUi();
   await renderPdf(new Uint8Array(buf));
   showViewer();
 }
@@ -78,6 +84,8 @@ async function loadPdfFromUrl(url) {
     elPdfName.title = name;
     S.pdfBytes = buf.slice(0);
     S.annotations = [];
+    S.selectedId = null;
+    updateSelectionUi();
     await renderPdf(new Uint8Array(buf));
     showViewer();
   } catch (err) {
@@ -246,6 +254,13 @@ document.addEventListener('keydown', (e) => {
     cancelSignMode();
     cancelTextMode();
     closeAllPanels();
+    selectAnnotation(null);
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && S.selectedId !== null) {
+    const t = e.target;
+    if (t.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    e.preventDefault();
+    deleteAnnotation(S.selectedId);
   }
 });
 
@@ -258,6 +273,8 @@ document.addEventListener('mousemove', (e) => {
 
 // ─── Click on overlay to place annotation ─────────────────────────────────
 function onOverlayClick(e, pageIndex, overlay) {
+  if (e.target.closest('.annotation')) return;
+  if (!S.pendingSig && !S.textActive) { selectAnnotation(null); return; }
   if (S.pendingSig) {
     placeSignature(e, pageIndex, overlay);
     return;
@@ -352,7 +369,7 @@ function createAnnotation(cfg) {
     textEl.addEventListener('input', () => {
       // Auto-grow height to fit content
       el.style.height = 'auto';
-      el.style.height = Math.max(textEl.scrollHeight + 4, S.textCfg.size + 12) + 'px';
+      el.style.height = Math.max(textEl.scrollHeight + 4, (parseFloat(textEl.style.fontSize) || 16) + 12) + 'px';
     });
     textEl.addEventListener('blur', () => {
       textEl.contentEditable = 'false';
@@ -389,10 +406,11 @@ function createAnnotation(cfg) {
   del.title = 'Delete';
   del.addEventListener('click', (e) => {
     e.stopPropagation();
-    el.remove();
-    S.annotations = S.annotations.filter(a => a.id !== id);
+    deleteAnnotation(id);
   });
   el.appendChild(del);
+
+  el.addEventListener('mousedown', () => selectAnnotation(id), true);
 
   // Drag to move
   el.addEventListener('mousedown', (e) => {
@@ -411,6 +429,7 @@ function createAnnotation(cfg) {
     textCfg: cfg.textCfg,
   };
   S.annotations.push(ann);
+  selectAnnotation(id);
   return ann;
 }
 
@@ -438,33 +457,116 @@ function startMove(e, el) {
   document.addEventListener('mouseup', onUp);
 }
 
-// ─── Resize ───────────────────────────────────────────────────────────────
+// ─── Selection ────────────────────────────────────────────────────────────
+function getAnn(id) { return S.annotations.find(a => a.id === id); }
+
+function selectAnnotation(id) {
+  S.selectedId = id;
+  S.annotations.forEach(a => a.el.classList.toggle('selected', a.id === id));
+  updateSelectionUi();
+}
+
+function updateSelectionUi() {
+  const none = !getAnn(S.selectedId);
+  elBtnShrink.disabled = none;
+  elBtnGrow.disabled = none;
+  elBtnDelete.disabled = none;
+}
+
+function deleteAnnotation(id) {
+  const ann = getAnn(id);
+  if (!ann) return;
+  ann.el.remove();
+  S.annotations = S.annotations.filter(a => a.id !== id);
+  if (S.selectedId === id) selectAnnotation(null);
+}
+
+const SCALE_STEP = 1.1;
+elBtnGrow.addEventListener('click', () => nudgeSize(SCALE_STEP));
+elBtnShrink.addEventListener('click', () => nudgeSize(1 / SCALE_STEP));
+elBtnDelete.addEventListener('click', () => deleteAnnotation(S.selectedId));
+
+function nudgeSize(factor) {
+  const ann = getAnn(S.selectedId);
+  if (ann) scaleAnnotation(ann, snapshot(ann), factor, '');
+}
+
+// ─── Resize (aspect ratio always preserved) ───────────────────────────────
+function snapshot(ann) {
+  const el = ann.el;
+  return {
+    left: el.offsetLeft, top: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight,
+    size: ann.type === 'text' ? ann.textCfg.size : 0,
+  };
+}
+
+// Scale annotation to orig * factor, keeping the edge/corner opposite `dir` fixed
+// (or the center when dir is empty).
+function scaleAnnotation(ann, orig, factor, dir) {
+  const el = ann.el;
+  const parent = el.parentElement;
+  const minSize = 20;
+
+  // Limits so the annotation stays usable and inside the page
+  let minF = Math.max(minSize / orig.w, minSize / orig.h);
+  let maxF = Math.min(parent.offsetWidth / orig.w, parent.offsetHeight / orig.h);
+  if (ann.type === 'text') {
+    minF = Math.max(6 / orig.size, minSize / orig.w);
+    maxF = Math.min(200 / orig.size, parent.offsetWidth / orig.w);
+  }
+  factor = Math.max(minF, Math.min(maxF, factor));
+
+  let w = orig.w * factor;
+  let h = orig.h * factor;
+
+  if (ann.type === 'text') {
+    const textEl = el.querySelector('.ann-text');
+    ann.textCfg.size = orig.size * factor;
+    textEl.style.fontSize = ann.textCfg.size + 'px';
+    el.style.width = w + 'px';
+    el.style.height = 'auto';
+    h = Math.max(textEl.scrollHeight + 4, ann.textCfg.size + 12);
+  }
+
+  // Keep the side opposite the dragged handle fixed; center on axes the handle doesn't touch.
+  const centerX = orig.left + (orig.w - w) / 2;
+  const centerY = orig.top + (orig.h - h) / 2;
+  let left, top;
+  if (dir.includes('w')) left = orig.left + orig.w - w;
+  else if (dir.includes('e')) left = orig.left;
+  else left = centerX;
+  if (dir.includes('n')) top = orig.top + orig.h - h;
+  else if (dir.includes('s')) top = orig.top;
+  else top = centerY;
+  left = Math.max(0, Math.min(left, parent.offsetWidth - w));
+  top = Math.max(0, Math.min(top, parent.offsetHeight - h));
+
+  el.style.left = left + 'px';
+  el.style.top = top + 'px';
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+}
+
 function startResize(e, el, dir) {
   e.preventDefault();
   e.stopPropagation();
+  const ann = S.annotations.find(a => a.el === el);
+  if (!ann) return;
 
   const startX = e.clientX;
   const startY = e.clientY;
-  const origLeft = el.offsetLeft;
-  const origTop = el.offsetTop;
-  const origW = el.offsetWidth;
-  const origH = el.offsetHeight;
-  const minSize = 20;
+  const orig = snapshot(ann);
 
   function onMove(ev) {
     const dx = ev.clientX - startX;
     const dy = ev.clientY - startY;
-    let left = origLeft, top = origTop, w = origW, h = origH;
-
-    if (dir.includes('e')) w = Math.max(minSize, origW + dx);
-    if (dir.includes('s')) h = Math.max(minSize, origH + dy);
-    if (dir.includes('w')) { w = Math.max(minSize, origW - dx); left = origLeft + origW - w; }
-    if (dir.includes('n')) { h = Math.max(minSize, origH - dy); top = origTop + origH - h; }
-
-    el.style.left = left + 'px';
-    el.style.top = top + 'px';
-    el.style.width = w + 'px';
-    el.style.height = h + 'px';
+    const fx = (orig.w + (dir.includes('w') ? -dx : dx)) / orig.w;
+    const fy = (orig.h + (dir.includes('n') ? -dy : dy)) / orig.h;
+    let factor;
+    if (dir === 'e' || dir === 'w') factor = fx;
+    else if (dir === 'n' || dir === 's') factor = fy;
+    else factor = Math.abs(fx - 1) >= Math.abs(fy - 1) ? fx : fy;
+    scaleAnnotation(ann, orig, factor, dir);
   }
   function onUp() {
     document.removeEventListener('mousemove', onMove);
