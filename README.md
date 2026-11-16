@@ -39,8 +39,7 @@ Search for **PDF Form Filler & Signer** in the [Chrome Web Store](https://chrome
 
 | Permission | Why it's needed |
 |---|---|
-| `storage` | Saves your preferences locally |
-| `downloads` | Downloads the completed PDF to your device |
+| `storage` | Saves your uploaded signatures locally |
 
 ## Privacy
 

@@ -3,7 +3,7 @@
   "name": "PDF Form Filler & Signer",
   "version": "1.0",
   "description": "Fill PDF forms, draw your signature, and add text — then download the result. No uploads, everything stays in your browser.",
-  "permissions": ["storage", "downloads"],
+  "permissions": ["storage"],
   "action": {
     "default_title": "PDF Form Filler & Signer — click to open",
     "default_icon": {

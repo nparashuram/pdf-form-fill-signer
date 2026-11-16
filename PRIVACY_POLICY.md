@@ -23,10 +23,9 @@ All processing happens entirely within your browser:
 
 The extension requests the following browser permissions:
 
-- **storage** — used solely to save your preferences (such as tool settings) locally on your device.
-- **downloads** — used to save the completed PDF to your device.
+- **storage** — used solely to save your uploaded signatures locally on your device.
 
-Neither permission is used to collect or transmit any data.
+This permission is not used to collect or transmit any data.
 
 ## Third-Party Services
 
